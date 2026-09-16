@@ -36,6 +36,7 @@ function App() {
 
   const [art, setArt] = useState(null);
   const [parts, setParts] = useState([]);
+  const [hoveredPartId, setHoveredPartId] = useState(null);
 
   const [selectedPart, setSelectedPart] = useState(null);
   const [videoInfo, setVideoInfo] = useState(null);
@@ -43,6 +44,8 @@ function App() {
 
   const [newPartNumber, setNewPartNumber] = useState('');
   const [newPartDescription, setNewPartDescription] = useState('');
+  const [newPartX, setNewPartX] = useState('');
+  const [newPartY, setNewPartY] = useState('');
   const [addPartError, setAddPartError] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -133,6 +136,7 @@ function App() {
 
   async function handleSelectSubassembly(subassembly) {
     setSelectedSubassembly(subassembly);
+    setHoveredPartId(null);
     const artRes = await fetch(`${API}/subassemblies/${subassembly.id}/art`, { headers: authHeader(token) });
     const artData = await artRes.json();
     setArt(artData);
@@ -160,6 +164,8 @@ function App() {
       part_number: newPartNumber,
       description: newPartDescription,
       art_id: art.id,
+      hotspot_x: newPartX || 50,
+      hotspot_y: newPartY || 50,
     });
     const res = await fetch(`${API}/parts?${params}`, {
       method: 'POST',
@@ -171,6 +177,8 @@ function App() {
     }
     setNewPartNumber('');
     setNewPartDescription('');
+    setNewPartX('');
+    setNewPartY('');
     const partsRes = await fetch(`${API}/art/${art.id}/parts`, { headers: authHeader(token) });
     setParts(await partsRes.json());
   }
@@ -276,7 +284,7 @@ function App() {
     );
   }
 
-  // Screen 5: Art + Parts (BOM)
+  // Screen 5: Art + Parts (BOM) with clickable hotspots
   if (selectedSubassembly) {
     return (
       <div className="page">
@@ -285,14 +293,32 @@ function App() {
         <div className="content">
           <div className="card">
             <h2 className="title">{selectedSubassembly.name}</h2>
-            {art && <img src={art.image_url} alt="Art diagram" style={{ maxWidth: '100%', marginBottom: 16, borderRadius: 6, border: '1px solid var(--border)' }} onError={(e) => (e.target.style.display = 'none')} />}
-            <div className="section-title">Parts</div>
+            <div className="section-title">Exploded diagram — click a marker or a part</div>
+            <div className="diagram-box">
+              {parts.map((part) => (
+                <div
+                  key={part.id}
+                  className={`hotspot ${hoveredPartId === part.id ? 'hotspot-active' : ''}`}
+                  style={{ left: `${part.hotspot_x}%`, top: `${part.hotspot_y}%` }}
+                  onClick={() => setHoveredPartId(part.id)}
+                  title={part.part_number}
+                >
+                  {parts.indexOf(part) + 1}
+                </div>
+              ))}
+            </div>
           </div>
           <div className="card-flat">
+            <div style={{ padding: '16px 18px 0 18px' }} className="section-title">Parts</div>
             <ul className="list">
-              {parts.map((part) => (
-                <li key={part.id} className="list-item">
+              {parts.map((part, i) => (
+                <li
+                  key={part.id}
+                  className={`list-item ${hoveredPartId === part.id ? 'list-item-active' : ''}`}
+                  onMouseEnter={() => setHoveredPartId(part.id)}
+                >
                   <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectPart(part)}>
+                    <span className="hotspot-tag">{i + 1}</span>
                     <span className="mono part-number">{part.part_number}</span>{part.description}
                   </span>
                   {userRole === 'admin' && (
@@ -308,6 +334,8 @@ function App() {
                 <div className="section-title">Add a New Part (Admin)</div>
                 <input className="input" placeholder="Part number" value={newPartNumber} onChange={(e) => setNewPartNumber(e.target.value)} />
                 <input className="input" placeholder="Description" value={newPartDescription} onChange={(e) => setNewPartDescription(e.target.value)} />
+                <input className="input" placeholder="Hotspot X (0-100)" type="number" value={newPartX} onChange={(e) => setNewPartX(e.target.value)} />
+                <input className="input" placeholder="Hotspot Y (0-100)" type="number" value={newPartY} onChange={(e) => setNewPartY(e.target.value)} />
                 <button className="btn" onClick={handleAddPart}>Add Part</button>
                 {addPartError && <p className="error-text">{addPartError}</p>}
               </div>

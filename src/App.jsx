@@ -284,68 +284,69 @@ function App() {
     );
   }
 
-  // Screen 5: Art + Parts (BOM) with clickable hotspots
+  // Screen 5: Art + Parts (BOM) — side by side
   if (selectedSubassembly) {
     return (
-      <div className="page">
+      <div className="page page-wide">
         <TopBar />
         <Breadcrumb />
         <div className="content">
-          <div className="card">
-            <h2 className="title">{selectedSubassembly.name}</h2>
-            <div className="section-title">Exploded diagram — click a marker or a part</div>
-            <div className="diagram-box">
-              {parts.map((part) => (
-                <div
-                  key={part.id}
-                  className={`hotspot ${hoveredPartId === part.id ? 'hotspot-active' : ''}`}
-                  style={{ left: `${part.hotspot_x}%`, top: `${part.hotspot_y}%` }}
-                  onClick={() => setHoveredPartId(part.id)}
-                  title={part.part_number}
-                >
-                  {parts.indexOf(part) + 1}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="card-flat">
-            <div style={{ padding: '16px 18px 0 18px' }} className="section-title">Parts</div>
-            <ul className="list">
-              {parts.map((part, i) => (
-                <li
-                  key={part.id}
-                  className={`list-item ${hoveredPartId === part.id ? 'list-item-active' : ''}`}
-                  onMouseEnter={() => setHoveredPartId(part.id)}
-                >
-                  <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectPart(part)}>
-                    <span className="hotspot-tag">{i + 1}</span>
-                    <span className="mono part-number">{part.part_number}</span>{part.description}
-                  </span>
-                  {userRole === 'admin' && (
-                    <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleDeletePart(part.id); }}>
-                      Delete
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {userRole === 'admin' && (
-              <div className="admin-box">
-                <div className="section-title">Add a New Part (Admin)</div>
-                <input className="input" placeholder="Part number" value={newPartNumber} onChange={(e) => setNewPartNumber(e.target.value)} />
-                <input className="input" placeholder="Description" value={newPartDescription} onChange={(e) => setNewPartDescription(e.target.value)} />
-                <input className="input" placeholder="Hotspot X (0-100)" type="number" value={newPartX} onChange={(e) => setNewPartX(e.target.value)} />
-                <input className="input" placeholder="Hotspot Y (0-100)" type="number" value={newPartY} onChange={(e) => setNewPartY(e.target.value)} />
-                <button className="btn" onClick={handleAddPart}>Add Part</button>
-                {addPartError && <p className="error-text">{addPartError}</p>}
+          <h2 className="title">{selectedSubassembly.name}</h2>
+          <div className="art-bom-layout">
+            <div className="card">
+              <div className="section-title">Exploded diagram — click a marker or a part</div>
+              <div className="diagram-box">
+                {parts.map((part) => (
+                  <div
+                    key={part.id}
+                    className={`hotspot ${hoveredPartId === part.id ? 'hotspot-active' : ''}`}
+                    style={{ left: `${part.hotspot_x}%`, top: `${part.hotspot_y}%` }}
+                    onClick={() => setHoveredPartId(part.id)}
+                    title={part.part_number}
+                  >
+                    {parts.indexOf(part) + 1}
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+            <div className="card-flat">
+              <div style={{ padding: '16px 18px 0 18px' }} className="section-title">Parts</div>
+              <ul className="list">
+                {parts.map((part, i) => (
+                  <li
+                    key={part.id}
+                    className={`list-item ${hoveredPartId === part.id ? 'list-item-active' : ''}`}
+                    onMouseEnter={() => setHoveredPartId(part.id)}
+                  >
+                    <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectPart(part)}>
+                      <span className="hotspot-tag">{i + 1}</span>
+                      <span className="mono part-number">{part.part_number}</span>{part.description}
+                    </span>
+                    {userRole === 'admin' && (
+                      <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleDeletePart(part.id); }}>
+                        Delete
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {userRole === 'admin' && (
+                <div className="admin-box">
+                  <div className="section-title">Add a New Part (Admin)</div>
+                  <input className="input" placeholder="Part number" value={newPartNumber} onChange={(e) => setNewPartNumber(e.target.value)} />
+                  <input className="input" placeholder="Description" value={newPartDescription} onChange={(e) => setNewPartDescription(e.target.value)} />
+                  <input className="input" placeholder="Hotspot X (0-100)" type="number" value={newPartX} onChange={(e) => setNewPartX(e.target.value)} />
+                  <input className="input" placeholder="Hotspot Y (0-100)" type="number" value={newPartY} onChange={(e) => setNewPartY(e.target.value)} />
+                  <button className="btn" onClick={handleAddPart}>Add Part</button>
+                  {addPartError && <p className="error-text">{addPartError}</p>}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
     );
   }
-
   // Screen 4: Sub-Assemblies
   if (selectedAssembly) {
     return (

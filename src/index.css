@@ -324,3 +324,25 @@ body {
   font-weight: 700;
   margin-right: 8px;
 }
+.page-wide {
+  max-width: 900px;
+}
+
+.art-bom-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.art-bom-layout .card,
+.art-bom-layout .card-flat {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+@media (max-width: 720px) {
+  .art-bom-layout {
+    flex-direction: column;
+  }
+}

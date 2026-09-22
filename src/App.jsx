@@ -55,6 +55,17 @@ function App() {
   const [chatResult, setChatResult] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
 
+  const [newVariantName, setNewVariantName] = useState('');
+  const [newVariantVin, setNewVariantVin] = useState('');
+  const [addVariantError, setAddVariantError] = useState('');
+
+  const [newAggregateName, setNewAggregateName] = useState('');
+  const [addAggregateError, setAddAggregateError] = useState('');
+  const [newAssemblyName, setNewAssemblyName] = useState('');
+  const [addAssemblyError, setAddAssemblyError] = useState('');
+  const [newSubassemblyName, setNewSubassemblyName] = useState('');
+  const [addSubassemblyError, setAddSubassemblyError] = useState('');
+
   function authHeader(authToken) {
     return { Authorization: `Bearer ${authToken}` };
   }
@@ -145,6 +156,56 @@ function App() {
       setParts(await partsRes.json());
     }
   }
+    async function handleAddAggregate() {
+    setAddAggregateError('');
+    if (!newAggregateName.trim()) { setAddAggregateError('Name is required'); return; }
+    const params = new URLSearchParams({ name: newAggregateName });
+    const res = await fetch(`${API}/variants/${selectedVariant.id}/aggregates?${params}`, { method: 'POST', headers: authHeader(token) });
+    if (!res.ok) { setAddAggregateError('Failed to add — are you sure you are an admin?'); return; }
+    setNewAggregateName('');
+    const r = await fetch(`${API}/variants/${selectedVariant.id}/aggregates`, { headers: authHeader(token) });
+    setAggregates(await r.json());
+  }
+
+  async function handleDeleteAggregate(id) {
+    await fetch(`${API}/aggregates/${id}`, { method: 'DELETE', headers: authHeader(token) });
+    const r = await fetch(`${API}/variants/${selectedVariant.id}/aggregates`, { headers: authHeader(token) });
+    setAggregates(await r.json());
+  }
+
+  async function handleAddAssembly() {
+    setAddAssemblyError('');
+    if (!newAssemblyName.trim()) { setAddAssemblyError('Name is required'); return; }
+    const params = new URLSearchParams({ name: newAssemblyName });
+    const res = await fetch(`${API}/aggregates/${selectedAggregate.id}/assemblies?${params}`, { method: 'POST', headers: authHeader(token) });
+    if (!res.ok) { setAddAssemblyError('Failed to add — are you sure you are an admin?'); return; }
+    setNewAssemblyName('');
+    const r = await fetch(`${API}/aggregates/${selectedAggregate.id}/assemblies`, { headers: authHeader(token) });
+    setAssemblies(await r.json());
+  }
+
+  async function handleDeleteAssembly(id) {
+    await fetch(`${API}/assemblies/${id}`, { method: 'DELETE', headers: authHeader(token) });
+    const r = await fetch(`${API}/aggregates/${selectedAggregate.id}/assemblies`, { headers: authHeader(token) });
+    setAssemblies(await r.json());
+  }
+
+  async function handleAddSubassembly() {
+    setAddSubassemblyError('');
+    if (!newSubassemblyName.trim()) { setAddSubassemblyError('Name is required'); return; }
+    const params = new URLSearchParams({ name: newSubassemblyName });
+    const res = await fetch(`${API}/assemblies/${selectedAssembly.id}/subassemblies?${params}`, { method: 'POST', headers: authHeader(token) });
+    if (!res.ok) { setAddSubassemblyError('Failed to add — are you sure you are an admin?'); return; }
+    setNewSubassemblyName('');
+    const r = await fetch(`${API}/assemblies/${selectedAssembly.id}/subassemblies`, { headers: authHeader(token) });
+    setSubassemblies(await r.json());
+  }
+
+  async function handleDeleteSubassembly(id) {
+    await fetch(`${API}/subassemblies/${id}`, { method: 'DELETE', headers: authHeader(token) });
+    const r = await fetch(`${API}/assemblies/${selectedAssembly.id}/subassemblies`, { headers: authHeader(token) });
+    setSubassemblies(await r.json());
+  }
 
   async function handleSelectPart(part) {
     setSelectedPart(part);
@@ -181,6 +242,33 @@ function App() {
     setNewPartY('');
     const partsRes = await fetch(`${API}/art/${art.id}/parts`, { headers: authHeader(token) });
     setParts(await partsRes.json());
+  }
+    async function handleAddVariant() {
+    setAddVariantError('');
+    if (!newVariantName.trim()) {
+      setAddVariantError('Name is required');
+      return;
+    }
+    const params = new URLSearchParams({ name: newVariantName });
+    if (newVariantVin.trim()) params.append('vin', newVariantVin);
+    const res = await fetch(`${API}/models/${selectedModel.id}/variants?${params}`, {
+      method: 'POST',
+      headers: authHeader(token),
+    });
+    if (!res.ok) {
+      setAddVariantError('Failed to add variant — are you sure you are an admin?');
+      return;
+    }
+    setNewVariantName('');
+    setNewVariantVin('');
+    const variantsRes = await fetch(`${API}/models/${selectedModel.id}/variants`, { headers: authHeader(token) });
+    setVariants(await variantsRes.json());
+  }
+
+  async function handleDeleteVariant(variantId) {
+    await fetch(`${API}/variants/${variantId}`, { method: 'DELETE', headers: authHeader(token) });
+    const variantsRes = await fetch(`${API}/models/${selectedModel.id}/variants`, { headers: authHeader(token) });
+    setVariants(await variantsRes.json());
   }
 
   async function handleDeletePart(partId) {
@@ -361,9 +449,22 @@ function App() {
             </div>
             <ul className="list">
               {subassemblies.map((sa) => (
-                <li key={sa.id} className="list-item" onClick={() => handleSelectSubassembly(sa)}>{sa.name}</li>
+                <li key={sa.id} className="list-item">
+                  <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectSubassembly(sa)}>{sa.name}</span>
+                  {userRole === 'admin' && (
+                    <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleDeleteSubassembly(sa.id); }}>Delete</button>
+                  )}
+                </li>
               ))}
             </ul>
+            {userRole === 'admin' && (
+              <div className="admin-box">
+                <div className="section-title">Add a New Sub-Assembly (Admin)</div>
+                <input className="input" placeholder="Sub-Assembly name" value={newSubassemblyName} onChange={(e) => setNewSubassemblyName(e.target.value)} />
+                <button className="btn" onClick={handleAddSubassembly}>Add Sub-Assembly</button>
+                {addSubassemblyError && <p className="error-text">{addSubassemblyError}</p>}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -384,9 +485,22 @@ function App() {
             </div>
             <ul className="list">
               {assemblies.map((a) => (
-                <li key={a.id} className="list-item" onClick={() => handleSelectAssembly(a)}>{a.name}</li>
+                <li key={a.id} className="list-item">
+                  <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectAssembly(a)}>{a.name}</span>
+                  {userRole === 'admin' && (
+                    <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleDeleteAssembly(a.id); }}>Delete</button>
+                  )}
+                </li>
               ))}
             </ul>
+            {userRole === 'admin' && (
+              <div className="admin-box">
+                <div className="section-title">Add a New Assembly (Admin)</div>
+                <input className="input" placeholder="Assembly name" value={newAssemblyName} onChange={(e) => setNewAssemblyName(e.target.value)} />
+                <button className="btn" onClick={handleAddAssembly}>Add Assembly</button>
+                {addAssemblyError && <p className="error-text">{addAssemblyError}</p>}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -407,9 +521,22 @@ function App() {
             </div>
             <ul className="list">
               {aggregates.map((agg) => (
-                <li key={agg.id} className="list-item" onClick={() => handleSelectAggregate(agg)}>{agg.name}</li>
+                <li key={agg.id} className="list-item">
+                  <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectAggregate(agg)}>{agg.name}</span>
+                  {userRole === 'admin' && (
+                    <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleDeleteAggregate(agg.id); }}>Delete</button>
+                  )}
+                </li>
               ))}
             </ul>
+            {userRole === 'admin' && (
+              <div className="admin-box">
+                <div className="section-title">Add a New Aggregate (Admin)</div>
+                <input className="input" placeholder="Aggregate name" value={newAggregateName} onChange={(e) => setNewAggregateName(e.target.value)} />
+                <button className="btn" onClick={handleAddAggregate}>Add Aggregate</button>
+                {addAggregateError && <p className="error-text">{addAggregateError}</p>}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -430,9 +557,23 @@ function App() {
             </div>
             <ul className="list">
               {variants.map((v) => (
-                <li key={v.id} className="list-item" onClick={() => handleSelectVariant(v)}>{v.name}</li>
+                <li key={v.id} className="list-item">
+                  <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectVariant(v)}>{v.name}</span>
+                  {userRole === 'admin' && (
+                    <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleDeleteVariant(v.id); }}>Delete</button>
+                  )}
+                </li>
               ))}
             </ul>
+            {userRole === 'admin' && (
+              <div className="admin-box">
+                <div className="section-title">Add a New Variant (Admin)</div>
+                <input className="input" placeholder="Variant name" value={newVariantName} onChange={(e) => setNewVariantName(e.target.value)} />
+                <input className="input" placeholder="VIN (optional)" value={newVariantVin} onChange={(e) => setNewVariantVin(e.target.value)} />
+                <button className="btn" onClick={handleAddVariant}>Add Variant</button>
+                {addVariantError && <p className="error-text">{addVariantError}</p>}
+              </div>
+            )}
           </div>
         </div>
       </div>

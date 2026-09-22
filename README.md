@@ -66,6 +66,4 @@ This frontend has been deployed and tested on [Vercel](https://vercel.com). Any 
 
 ## Known Limitations
 
-- The API URL is hardcoded rather than read from a build-time environment variable — a small future improvement would be using Vite's `.env` support instead
-- The Approver role has no distinct UI yet — it works at the API level but the interface doesn't show anything different for that role
-- No automated tests
+See [LIMITATIONS.md](../atomism-backend-restored/LIMITATIONS.md) in the backend repo for the full list.

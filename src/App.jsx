@@ -69,6 +69,7 @@ function App() {
   // Art+BOM toolbar state
   const [viewMode, setViewMode] = useState('both'); // 'both' | 'art' | 'bom'
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [notice, setNotice] = useState(null);
 
   function authHeader(authToken) {
     return { Authorization: `Bearer ${authToken}` };
@@ -410,21 +411,43 @@ function App() {
 
   function TopNav() {
     return (
-      <div className="topnav">
-        <div className="topnav-links">
-          <span onClick={resetAllScreens}>Home</span>
-          <span>Catalogue</span>
-          <span>Downloads</span>
-          <span>Support</span>
-          <span>Contact Us</span>
+      <>
+        <div className="topnav">
+          <div className="topnav-links">
+            <span onClick={resetAllScreens}>Home</span>
+            <span>Catalogue</span>
+            <span>Downloads</span>
+            <span>Support</span>
+            <span>Contact Us</span>
+          </div>
+          <div className="topnav-right">
+            <span
+              title="Bookmarks — coming in Phase 2"
+              style={{ cursor: 'pointer', fontSize: 18 }}
+              onClick={() => setNotice('🔖 Bookmarks are planned for Phase 2 of this project.')}
+            >
+              🔖
+            </span>
+            <span
+              title="Cart & Ordering — coming in Phase 2"
+              style={{ cursor: 'pointer', fontSize: 18 }}
+              onClick={() => setNotice('🛒 Cart & ordering are planned for Phase 2 of this project.')}
+            >
+              🛒
+            </span>
+            <span className={`badge ${userRole === 'admin' ? 'badge-admin' : 'badge-tech'}`}>
+              {userRole === 'admin' ? 'Admin' : userRole === 'approver' ? 'Approver' : 'Technician'}
+            </span>
+            <button className="btn btn-secondary" onClick={handleLogout}>Log out</button>
+          </div>
         </div>
-        <div className="topnav-right">
-          <span className={`badge ${userRole === 'admin' ? 'badge-admin' : 'badge-tech'}`}>
-            {userRole === 'admin' ? 'Admin' : userRole === 'approver' ? 'Approver' : 'Technician'}
-          </span>
-          <button className="btn btn-secondary" onClick={handleLogout}>Log out</button>
-        </div>
-      </div>
+        {notice && (
+          <div style={{ background: '#fff8e1', borderBottom: '1px solid #f0d97a', padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>{notice}</span>
+            <button className="btn btn-secondary" onClick={() => setNotice(null)}>Dismiss</button>
+          </div>
+        )}
+      </>
     );
   }
 

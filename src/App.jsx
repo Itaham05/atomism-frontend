@@ -178,18 +178,29 @@ function App() {
 
   async function handleSelectPart(part) {
     setSelectedPart(part);
-    const videoRes = await fetch(`${API}/parts/${part.id}/videos`);
+    const videoRes = await fetch(`${API}/parts/${part.id}/videos`, { headers: authHeader(token) });
     setVideoInfo(await videoRes.json());
-    const docRes = await fetch(`${API}/parts/${part.id}/servicedocs`);
+    const docRes = await fetch(`${API}/parts/${part.id}/servicedocs`, { headers: authHeader(token) });
     setDocInfo(await docRes.json());
   }
 
   async function handleJumpToPart(partLike) {
     setSelectedPart(partLike);
-    const videoRes = await fetch(`${API}/parts/${partLike.id}/videos`);
+    const videoRes = await fetch(`${API}/parts/${partLike.id}/videos`, { headers: authHeader(token) });
     setVideoInfo(await videoRes.json());
-    const docRes = await fetch(`${API}/parts/${partLike.id}/servicedocs`);
+    const docRes = await fetch(`${API}/parts/${partLike.id}/servicedocs`, { headers: authHeader(token) });
     setDocInfo(await docRes.json());
+  }
+
+  function buildTimestampedUrl(url, timestamp) {
+    if (!timestamp) return url;
+    const seconds = parseInt(timestamp, 10);
+    if (isNaN(seconds)) return url;
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      const sep = url.includes('?') ? '&' : '?';
+      return `${url}${sep}t=${seconds}s`;
+    }
+    return `${url}#t=${seconds}`;
   }
 
   async function handleAddPart() {
@@ -328,7 +339,7 @@ function App() {
     if (!chatQuery.trim()) return;
     setSearchResults(null);
     setChatLoading(true);
-    const res = await fetch(`${API}/chatbot/ask?q=${encodeURIComponent(chatQuery)}`);
+    const res = await fetch(`${API}/chatbot/ask?q=${encodeURIComponent(chatQuery)}`, { headers: authHeader(token) });
     setChatResult(await res.json());
     setChatLoading(false);
   }
@@ -425,9 +436,9 @@ function App() {
           <h2 className="title mono">{selectedPart.part_number}</h2>
           <p className="subtitle" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>{selectedPart.description}</p>
           <div className="section-title">Training Video</div>
-          {videoInfo?.available ? (
+            {videoInfo?.available ? (
             videoInfo.videos.map((v) => (
-              <p key={v.id}>🎥 <a className="link" href={v.url} target="_blank" rel="noreferrer">{v.url}</a> (jumps to {v.timestamp})</p>
+              <p key={v.id}>🎥 <a className="link" href={buildTimestampedUrl(v.url, v.timestamp)} target="_blank" rel="noreferrer">{v.title || v.url}</a>{v.timestamp ? ` (jumps to ${v.timestamp}s)` : ''}</p>
             ))
           ) : (
             <p className="muted">No video available for this part.</p>
@@ -690,7 +701,18 @@ function App() {
               <br /><small className="muted">Confidence: {(chatResult.confidence * 100).toFixed(1)}%</small>
             </div>
           )}
-          {chatResult?.answer && <p className="muted" style={{ marginTop: 10 }}>{chatResult.answer}</p>}
+                    {chatResult?.answer && <p className="muted" style={{ marginTop: 10 }}>{chatResult.answer}</p>}
+          {chatResult?.citation && (
+            <div style={{ marginTop: 8 }}>
+              {chatResult.citation.type === 'video' ? (
+                <a href={buildTimestampedUrl(chatResult.citation.url, chatResult.citation.timestamp)} target="_blank" rel="noreferrer">
+                  📹 {chatResult.citation.label}{chatResult.citation.timestamp ? ` — jumps to ${chatResult.citation.timestamp}s` : ''}
+                </a>
+              ) : (
+                <a href={chatResult.citation.url} target="_blank" rel="noreferrer">📄 {chatResult.citation.label}</a>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="card-flat">

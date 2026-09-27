@@ -280,7 +280,7 @@ function App() {
     if (type === 'model') setEditing({ type, id: item.id, values: { name: item.name } });
     if (type === 'variant') setEditing({ type, id: item.id, values: { name: item.name, vin: item.vin || '', engine_number: item.engine_number || '' } });
     if (type === 'aggregate' || type === 'assembly' || type === 'subassembly') setEditing({ type, id: item.id, values: { name: item.name } });
-    if (type === 'part') setEditing({ type, id: item.id, values: { part_number: item.part_number, description: item.description, hotspot_x: item.hotspot_x ?? '', hotspot_y: item.hotspot_y ?? '' } });
+    if (type === 'part') setEditing({ type, id: item.id, values: { part_number: item.part_number, description: item.description, hotspot_x: item.hotspot_x ?? '', hotspot_y: item.hotspot_y ?? '', is_alternate: !!item.is_alternate, is_obsolete: !!item.is_obsolete, superseded_by: item.superseded_by || '' } });
   }
 
   function cancelEdit() {
@@ -308,13 +308,19 @@ function App() {
         description: editing.values.description,
         hotspot_x: editing.values.hotspot_x,
         hotspot_y: editing.values.hotspot_y,
+        is_alternate: editing.values.is_alternate,
+        is_obsolete: editing.values.is_obsolete,
+        superseded_by: editing.values.superseded_by,
       },
     };
     const rawParams = paramsByType[editing.type];
     const cleanParams = {};
     Object.keys(rawParams).forEach((k) => {
-      if (rawParams[k] !== '' && rawParams[k] !== null && rawParams[k] !== undefined) {
-        cleanParams[k] = rawParams[k];
+      const v = rawParams[k];
+      if (typeof v === 'boolean' || k === 'superseded_by') {
+        cleanParams[k] = v;
+      } else if (v !== '' && v !== null && v !== undefined) {
+        cleanParams[k] = v;
       }
     });
     const params = new URLSearchParams(cleanParams);
@@ -552,6 +558,16 @@ function App() {
         <div className="card">
           <h2 className="title mono">{selectedPart.part_number}</h2>
           <p className="subtitle" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>{selectedPart.description}</p>
+          {selectedPart.is_obsolete && (
+            <p style={{ fontSize: 13, padding: '4px 10px', borderRadius: 4, background: '#fdecea', color: '#a33', fontWeight: 600, display: 'inline-block', marginRight: 8 }}>
+              ⚠ Obsolete{selectedPart.superseded_by ? ` — replaced by ${selectedPart.superseded_by}` : ''}
+            </p>
+          )}
+          {selectedPart.is_alternate && (
+            <p style={{ fontSize: 13, padding: '4px 10px', borderRadius: 4, background: '#eef4fb', color: '#2a5', fontWeight: 600, display: 'inline-block' }}>
+              Alternate part available
+            </p>
+          )}
           <div className="section-title">Training Video</div>
           {videoInfo?.available ? (
             videoInfo.videos.map((v) => (
@@ -635,9 +651,18 @@ function App() {
                             <input className="input" style={{ marginBottom: 0 }} value={editing.values.description} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, description: e.target.value } })} />
                           </td>
                           <td style={{ padding: '8px 10px' }} colSpan={2}>
-                            <div style={{ display: 'flex', gap: 4 }}>
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                               <input className="input" style={{ marginBottom: 0, width: 70 }} type="number" placeholder="Hotspot X" value={editing.values.hotspot_x} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, hotspot_x: e.target.value } })} />
                               <input className="input" style={{ marginBottom: 0, width: 70 }} type="number" placeholder="Hotspot Y" value={editing.values.hotspot_y} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, hotspot_y: e.target.value } })} />
+                              <label style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 13 }}>
+                                <input type="checkbox" checked={editing.values.is_alternate} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, is_alternate: e.target.checked } })} />
+                                Alternate
+                              </label>
+                              <label style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 13 }}>
+                                <input type="checkbox" checked={editing.values.is_obsolete} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, is_obsolete: e.target.checked } })} />
+                                Obsolete
+                              </label>
+                              <input className="input" style={{ marginBottom: 0, width: 140 }} placeholder="Superseded by (part #)" value={editing.values.superseded_by} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, superseded_by: e.target.value } })} />
                             </div>
                           </td>
                           {userRole === 'admin' && (
@@ -658,7 +683,19 @@ function App() {
                         >
                           <td style={{ padding: '8px 10px' }}>{i + 1}</td>
                           <td style={{ padding: '8px 10px', color: 'var(--orange-dark)', fontWeight: 600, textDecoration: 'underline' }}>{part.part_number}</td>
-                          <td style={{ padding: '8px 10px' }}>{part.description}</td>
+                          <td style={{ padding: '8px 10px' }}>
+                            {part.description}
+                            {part.is_obsolete && (
+                              <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 6px', borderRadius: 4, background: '#fdecea', color: '#a33', fontWeight: 600 }}>
+                                Obsolete{part.superseded_by ? ` — see ${part.superseded_by}` : ''}
+                              </span>
+                            )}
+                            {part.is_alternate && (
+                              <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 6px', borderRadius: 4, background: '#eef4fb', color: '#2a5', fontWeight: 600 }}>
+                                Alternate
+                              </span>
+                            )}
+                          </td>
                           <td style={{ padding: '8px 10px' }}>1</td>
                           <td style={{ padding: '8px 10px' }}>-</td>
                           {userRole === 'admin' && (

@@ -57,6 +57,11 @@ function App() {
   const [addAssemblyError, setAddAssemblyError] = useState('');
   const [newSubassemblyName, setNewSubassemblyName] = useState('');
   const [addSubassemblyError, setAddSubassemblyError] = useState('');
+  const [newModelName, setNewModelName] = useState('');
+  const [addModelError, setAddModelError] = useState('');
+
+  const [editing, setEditing] = useState(null); // { type, id, values }
+  const [editError, setEditError] = useState('');
   
   const [searchType, setSearchType] = useState('description');
   const [searchQuery, setSearchQuery] = useState('');
@@ -253,6 +258,95 @@ function App() {
     await fetch(`${API}/variants/${id}`, { method: 'DELETE', headers: authHeader(token) });
     const r = await fetch(`${API}/models/${selectedModel.id}/variants`, { headers: authHeader(token) });
     setVariants(await r.json());
+  }
+
+  async function handleAddModel() {
+    setAddModelError('');
+    if (!newModelName.trim()) { setAddModelError('Name is required'); return; }
+    const params = new URLSearchParams({ name: newModelName });
+    const res = await fetch(`${API}/models?${params}`, { method: 'POST', headers: authHeader(token) });
+    if (!res.ok) { setAddModelError('Failed to add — are you sure you are an admin?'); return; }
+    setNewModelName('');
+    await fetchModels(token);
+  }
+
+  async function handleDeleteModel(id) {
+    await fetch(`${API}/models/${id}`, { method: 'DELETE', headers: authHeader(token) });
+    await fetchModels(token);
+  }
+
+  function startEdit(type, item) {
+    setEditError('');
+    if (type === 'model') setEditing({ type, id: item.id, values: { name: item.name } });
+    if (type === 'variant') setEditing({ type, id: item.id, values: { name: item.name, vin: item.vin || '', engine_number: item.engine_number || '' } });
+    if (type === 'aggregate' || type === 'assembly' || type === 'subassembly') setEditing({ type, id: item.id, values: { name: item.name } });
+    if (type === 'part') setEditing({ type, id: item.id, values: { part_number: item.part_number, description: item.description, hotspot_x: item.hotspot_x ?? '', hotspot_y: item.hotspot_y ?? '' } });
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setEditError('');
+  }
+
+  async function saveEdit() {
+    const endpoints = {
+      model: `/models/${editing.id}`,
+      variant: `/variants/${editing.id}`,
+      aggregate: `/aggregates/${editing.id}`,
+      assembly: `/assemblies/${editing.id}`,
+      subassembly: `/subassemblies/${editing.id}`,
+      part: `/parts/${editing.id}`,
+    };
+    const paramsByType = {
+      model: { name: editing.values.name },
+      variant: { name: editing.values.name, vin: editing.values.vin, engine_number: editing.values.engine_number },
+      aggregate: { name: editing.values.name },
+      assembly: { name: editing.values.name },
+      subassembly: { name: editing.values.name },
+      part: {
+        part_number: editing.values.part_number,
+        description: editing.values.description,
+        hotspot_x: editing.values.hotspot_x,
+        hotspot_y: editing.values.hotspot_y,
+      },
+    };
+    const rawParams = paramsByType[editing.type];
+    const cleanParams = {};
+    Object.keys(rawParams).forEach((k) => {
+      if (rawParams[k] !== '' && rawParams[k] !== null && rawParams[k] !== undefined) {
+        cleanParams[k] = rawParams[k];
+      }
+    });
+    const params = new URLSearchParams(cleanParams);
+    const res = await fetch(`${API}${endpoints[editing.type]}?${params}`, { method: 'PUT', headers: authHeader(token) });
+    if (!res.ok) {
+      setEditError('Update failed. Please check the fields and try again.');
+      return;
+    }
+    const editedType = editing.type;
+    setEditing(null);
+    setEditError('');
+    if (editedType === 'model') await fetchModels(token);
+    if (editedType === 'variant' && selectedModel) {
+      const r = await fetch(`${API}/models/${selectedModel.id}/variants`, { headers: authHeader(token) });
+      setVariants(await r.json());
+    }
+    if (editedType === 'aggregate' && selectedVariant) {
+      const r = await fetch(`${API}/variants/${selectedVariant.id}/aggregates`, { headers: authHeader(token) });
+      setAggregates(await r.json());
+    }
+    if (editedType === 'assembly' && selectedAggregate) {
+      const r = await fetch(`${API}/aggregates/${selectedAggregate.id}/assemblies`, { headers: authHeader(token) });
+      setAssemblies(await r.json());
+    }
+    if (editedType === 'subassembly' && selectedAssembly) {
+      const r = await fetch(`${API}/assemblies/${selectedAssembly.id}/subassemblies`, { headers: authHeader(token) });
+      setSubassemblies(await r.json());
+    }
+    if (editedType === 'part' && art) {
+      const r = await fetch(`${API}/art/${art.id}/parts`, { headers: authHeader(token) });
+      setParts(await r.json());
+    }
   }
 
   async function handleAddAggregate() {
@@ -459,7 +553,7 @@ function App() {
           <h2 className="title mono">{selectedPart.part_number}</h2>
           <p className="subtitle" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>{selectedPart.description}</p>
           <div className="section-title">Training Video</div>
-            {videoInfo?.available ? (
+          {videoInfo?.available ? (
             videoInfo.videos.map((v) => (
               <p key={v.id}>🎥 <a className="link" href={buildTimestampedUrl(v.url, v.timestamp)} target="_blank" rel="noreferrer">{v.title || v.url}</a>{v.timestamp ? ` (jumps to ${v.timestamp}s)` : ''}</p>
             ))
@@ -531,26 +625,56 @@ function App() {
                   </thead>
                   <tbody>
                     {parts.map((part, i) => (
-                      <tr
-                        key={part.id}
-                        style={{ borderBottom: '1px solid #f0efe9', background: hoveredPartId === part.id ? 'var(--orange-light)' : 'white', cursor: 'pointer' }}
-                        onMouseEnter={() => setHoveredPartId(part.id)}
-                        onClick={() => handleSelectPart(part)}
-                      >
-                        <td style={{ padding: '8px 10px' }}>{i + 1}</td>
-                        <td style={{ padding: '8px 10px', color: 'var(--orange-dark)', fontWeight: 600, textDecoration: 'underline' }}>{part.part_number}</td>
-                        <td style={{ padding: '8px 10px' }}>{part.description}</td>
-                        <td style={{ padding: '8px 10px' }}>1</td>
-                        <td style={{ padding: '8px 10px' }}>-</td>
-                        {userRole === 'admin' && (
+                      editing?.type === 'part' && editing.id === part.id ? (
+                        <tr key={part.id} style={{ borderBottom: '1px solid #f0efe9', background: 'var(--orange-light)' }}>
+                          <td style={{ padding: '8px 10px' }}>{i + 1}</td>
                           <td style={{ padding: '8px 10px' }}>
-                            <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleDeletePart(part.id); }}>Delete</button>
+                            <input className="input" style={{ marginBottom: 0 }} value={editing.values.part_number} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, part_number: e.target.value } })} />
                           </td>
-                        )}
-                      </tr>
+                          <td style={{ padding: '8px 10px' }}>
+                            <input className="input" style={{ marginBottom: 0 }} value={editing.values.description} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, description: e.target.value } })} />
+                          </td>
+                          <td style={{ padding: '8px 10px' }} colSpan={2}>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <input className="input" style={{ marginBottom: 0, width: 70 }} type="number" placeholder="Hotspot X" value={editing.values.hotspot_x} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, hotspot_x: e.target.value } })} />
+                              <input className="input" style={{ marginBottom: 0, width: 70 }} type="number" placeholder="Hotspot Y" value={editing.values.hotspot_y} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, hotspot_y: e.target.value } })} />
+                            </div>
+                          </td>
+                          {userRole === 'admin' && (
+                            <td style={{ padding: '8px 10px' }}>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="btn" onClick={saveEdit}>Save</button>
+                                <button className="btn btn-secondary" onClick={cancelEdit}>Cancel</button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ) : (
+                        <tr
+                          key={part.id}
+                          style={{ borderBottom: '1px solid #f0efe9', background: hoveredPartId === part.id ? 'var(--orange-light)' : 'white', cursor: 'pointer' }}
+                          onMouseEnter={() => setHoveredPartId(part.id)}
+                          onClick={() => handleSelectPart(part)}
+                        >
+                          <td style={{ padding: '8px 10px' }}>{i + 1}</td>
+                          <td style={{ padding: '8px 10px', color: 'var(--orange-dark)', fontWeight: 600, textDecoration: 'underline' }}>{part.part_number}</td>
+                          <td style={{ padding: '8px 10px' }}>{part.description}</td>
+                          <td style={{ padding: '8px 10px' }}>1</td>
+                          <td style={{ padding: '8px 10px' }}>-</td>
+                          {userRole === 'admin' && (
+                            <td style={{ padding: '8px 10px' }}>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="btn btn-secondary" onClick={(e) => { e.stopPropagation(); startEdit('part', part); }}>Edit</button>
+                                <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleDeletePart(part.id); }}>Delete</button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      )
                     ))}
                   </tbody>
                 </table>
+                {editError && <p className="error-text" style={{ padding: '0 14px' }}>{editError}</p>}
 
                 {userRole === 'admin' && (
                   <div className="admin-box">
@@ -579,12 +703,28 @@ function App() {
           </div>
           <ul className="list">
             {subassemblies.map((sa) => (
-              <li key={sa.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectSubassembly(sa)}>{sa.name}</span>
-                {userRole === 'admin' && <button className="btn btn-danger" onClick={() => handleDeleteSubassembly(sa.id)}>Delete</button>}
+              <li key={sa.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {editing?.type === 'subassembly' && editing.id === sa.id ? (
+                  <div style={{ display: 'flex', gap: 6, flex: 1, alignItems: 'center' }}>
+                    <input className="input" style={{ marginBottom: 0 }} value={editing.values.name} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, name: e.target.value } })} />
+                    <button className="btn" onClick={saveEdit}>Save</button>
+                    <button className="btn btn-secondary" onClick={cancelEdit}>Cancel</button>
+                  </div>
+                ) : (
+                  <>
+                    <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectSubassembly(sa)}>{sa.name}</span>
+                    {userRole === 'admin' && (
+                      <span style={{ display: 'flex', gap: 6 }}>
+                        <button className="btn btn-secondary" onClick={() => startEdit('subassembly', sa)}>Edit</button>
+                        <button className="btn btn-danger" onClick={() => handleDeleteSubassembly(sa.id)}>Delete</button>
+                      </span>
+                    )}
+                  </>
+                )}
               </li>
             ))}
           </ul>
+          {editError && <p className="error-text">{editError}</p>}
           {userRole === 'admin' && (
             <div className="admin-box">
               <div className="section-title">Add a New Sub-Assembly (Admin)</div>
@@ -606,12 +746,28 @@ function App() {
           </div>
           <ul className="list">
             {assemblies.map((a) => (
-              <li key={a.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectAssembly(a)}>{a.name}</span>
-                {userRole === 'admin' && <button className="btn btn-danger" onClick={() => handleDeleteAssembly(a.id)}>Delete</button>}
+              <li key={a.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {editing?.type === 'assembly' && editing.id === a.id ? (
+                  <div style={{ display: 'flex', gap: 6, flex: 1, alignItems: 'center' }}>
+                    <input className="input" style={{ marginBottom: 0 }} value={editing.values.name} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, name: e.target.value } })} />
+                    <button className="btn" onClick={saveEdit}>Save</button>
+                    <button className="btn btn-secondary" onClick={cancelEdit}>Cancel</button>
+                  </div>
+                ) : (
+                  <>
+                    <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectAssembly(a)}>{a.name}</span>
+                    {userRole === 'admin' && (
+                      <span style={{ display: 'flex', gap: 6 }}>
+                        <button className="btn btn-secondary" onClick={() => startEdit('assembly', a)}>Edit</button>
+                        <button className="btn btn-danger" onClick={() => handleDeleteAssembly(a.id)}>Delete</button>
+                      </span>
+                    )}
+                  </>
+                )}
               </li>
             ))}
           </ul>
+          {editError && <p className="error-text">{editError}</p>}
           {userRole === 'admin' && (
             <div className="admin-box">
               <div className="section-title">Add a New Assembly (Admin)</div>
@@ -633,12 +789,28 @@ function App() {
           </div>
           <ul className="list">
             {aggregates.map((agg) => (
-              <li key={agg.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectAggregate(agg)}>{agg.name}</span>
-                {userRole === 'admin' && <button className="btn btn-danger" onClick={() => handleDeleteAggregate(agg.id)}>Delete</button>}
+              <li key={agg.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {editing?.type === 'aggregate' && editing.id === agg.id ? (
+                  <div style={{ display: 'flex', gap: 6, flex: 1, alignItems: 'center' }}>
+                    <input className="input" style={{ marginBottom: 0 }} value={editing.values.name} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, name: e.target.value } })} />
+                    <button className="btn" onClick={saveEdit}>Save</button>
+                    <button className="btn btn-secondary" onClick={cancelEdit}>Cancel</button>
+                  </div>
+                ) : (
+                  <>
+                    <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectAggregate(agg)}>{agg.name}</span>
+                    {userRole === 'admin' && (
+                      <span style={{ display: 'flex', gap: 6 }}>
+                        <button className="btn btn-secondary" onClick={() => startEdit('aggregate', agg)}>Edit</button>
+                        <button className="btn btn-danger" onClick={() => handleDeleteAggregate(agg.id)}>Delete</button>
+                      </span>
+                    )}
+                  </>
+                )}
               </li>
             ))}
           </ul>
+          {editError && <p className="error-text">{editError}</p>}
           {userRole === 'admin' && (
             <div className="admin-box">
               <div className="section-title">Add a New Aggregate (Admin)</div>
@@ -660,12 +832,30 @@ function App() {
           </div>
           <ul className="list">
             {variants.map((v) => (
-              <li key={v.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectVariant(v)}>{v.name}</span>
-                {userRole === 'admin' && <button className="btn btn-danger" onClick={() => handleDeleteVariant(v.id)}>Delete</button>}
+              <li key={v.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {editing?.type === 'variant' && editing.id === v.id ? (
+                  <div style={{ display: 'flex', gap: 6, flex: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input className="input" style={{ marginBottom: 0, width: 140 }} placeholder="Name" value={editing.values.name} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, name: e.target.value } })} />
+                    <input className="input" style={{ marginBottom: 0, width: 140 }} placeholder="VIN" value={editing.values.vin} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, vin: e.target.value } })} />
+                    <input className="input" style={{ marginBottom: 0, width: 160 }} placeholder="Engine number" value={editing.values.engine_number} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, engine_number: e.target.value } })} />
+                    <button className="btn" onClick={saveEdit}>Save</button>
+                    <button className="btn btn-secondary" onClick={cancelEdit}>Cancel</button>
+                  </div>
+                ) : (
+                  <>
+                    <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectVariant(v)}>{v.name}</span>
+                    {userRole === 'admin' && (
+                      <span style={{ display: 'flex', gap: 6 }}>
+                        <button className="btn btn-secondary" onClick={() => startEdit('variant', v)}>Edit</button>
+                        <button className="btn btn-danger" onClick={() => handleDeleteVariant(v.id)}>Delete</button>
+                      </span>
+                    )}
+                  </>
+                )}
               </li>
             ))}
           </ul>
+          {editError && <p className="error-text">{editError}</p>}
           {userRole === 'admin' && (
             <div className="admin-box">
               <div className="section-title">Add a New Variant (Admin)</div>
@@ -724,20 +914,16 @@ function App() {
               <br /><small className="muted">Confidence: {(chatResult.confidence * 100).toFixed(1)}%</small>
             </div>
           )}
-            {chatResult?.answer && <p className="muted" style={{ marginTop: 10 }}>{chatResult.answer}</p>}
-            {chatResult?.citations?.length > 0 && (
+          {chatResult?.answer && <p className="muted" style={{ marginTop: 10 }}>{chatResult.answer}</p>}
+          {chatResult?.citation && (
             <div style={{ marginTop: 8 }}>
-              {chatResult.citations.map((c, i) => (
-                <p key={i}>
-                  {c.type === 'video' ? (
-                    <a href={buildTimestampedUrl(c.url, c.timestamp)} target="_blank" rel="noreferrer">
-                      📹 {c.label}{c.timestamp ? ` — jumps to ${c.timestamp}s` : ''}
-                    </a>
-                  ) : (
-                    <a href={c.url} target="_blank" rel="noreferrer">📄 {c.label}</a>
-                  )}
-                </p>
-              ))}
+              {chatResult.citation.type === 'video' ? (
+                <a href={buildTimestampedUrl(chatResult.citation.url, chatResult.citation.timestamp)} target="_blank" rel="noreferrer">
+                  📹 {chatResult.citation.label}{chatResult.citation.timestamp ? ` — jumps to ${chatResult.citation.timestamp}s` : ''}
+                </a>
+              ) : (
+                <a href={chatResult.citation.url} target="_blank" rel="noreferrer">📄 {chatResult.citation.label}</a>
+              )}
             </div>
           )}
         </div>
@@ -746,9 +932,36 @@ function App() {
           <div style={{ padding: '16px 18px 0 18px' }} className="section-title">Browse by Model</div>
           <ul className="list">
             {models.map((m) => (
-              <li key={m.id} style={listItem} onClick={() => handleSelectModel(m)}>{m.name}</li>
+              <li key={m.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {editing?.type === 'model' && editing.id === m.id ? (
+                  <div style={{ display: 'flex', gap: 6, flex: 1, alignItems: 'center' }}>
+                    <input className="input" style={{ marginBottom: 0 }} value={editing.values.name} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, name: e.target.value } })} />
+                    <button className="btn" onClick={saveEdit}>Save</button>
+                    <button className="btn btn-secondary" onClick={cancelEdit}>Cancel</button>
+                  </div>
+                ) : (
+                  <>
+                    <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectModel(m)}>{m.name}</span>
+                    {userRole === 'admin' && (
+                      <span style={{ display: 'flex', gap: 6 }}>
+                        <button className="btn btn-secondary" onClick={() => startEdit('model', m)}>Edit</button>
+                        <button className="btn btn-danger" onClick={() => handleDeleteModel(m.id)}>Delete</button>
+                      </span>
+                    )}
+                  </>
+                )}
+              </li>
             ))}
           </ul>
+          {editError && <p className="error-text" style={{ padding: '0 18px' }}>{editError}</p>}
+          {userRole === 'admin' && (
+            <div className="admin-box">
+              <div className="section-title">Add a New Model (Admin)</div>
+              <input className="input" placeholder="Model name" value={newModelName} onChange={(e) => setNewModelName(e.target.value)} />
+              <button className="btn" onClick={handleAddModel}>Add Model</button>
+              {addModelError && <p className="error-text">{addModelError}</p>}
+            </div>
+          )}
         </div>
       </>
     );

@@ -7,9 +7,10 @@
   --charcoal-light: #2a2e38;
   --steel: #4b5563;
   --steel-light: #9ca3af;
-  --orange: #ff6a13;
-  --orange-dark: #e0570a;
-  --orange-light: #ffe8d9;
+  --orange: #2e8b1f;
+  --orange-dark: #1f6b14;
+  --orange-light: #e6f4e1;
+  --green-gradient: linear-gradient(90deg, #1f6b14 0%, #4caf1f 100%);
   --off-white: #f6f5f2;
   --border: #e2e0da;
   --text: #1c1f26;
@@ -267,8 +268,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--charcoal);
-  background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 12px);
+  background: var(--off-white);
+}
+
+.login-wrap::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 6px;
+  background: var(--green-gradient);
 }
 
 .login-card {
@@ -354,14 +362,14 @@ body {
 }
 
 .topnav {
-  background: linear-gradient(90deg, var(--charcoal) 0%, var(--charcoal-light) 100%);
+  background: var(--green-gradient);
   color: white;
   padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 56px;
-  border-bottom: 3px solid var(--orange);
+  border-top: 2px solid #c9f0bd;
 }
 
 .topnav-links {

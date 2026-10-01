@@ -952,17 +952,17 @@ function App() {
             </div>
           )}
           {chatResult?.answer && <p className="muted" style={{ marginTop: 10 }}>{chatResult.answer}</p>}
-          {chatResult?.citation && (
-            <div style={{ marginTop: 8 }}>
-              {chatResult.citation.type === 'video' ? (
-                <a href={buildTimestampedUrl(chatResult.citation.url, chatResult.citation.timestamp)} target="_blank" rel="noreferrer">
-                  📹 {chatResult.citation.label}{chatResult.citation.timestamp ? ` — jumps to ${chatResult.citation.timestamp}s` : ''}
+          {chatResult?.citations?.map((c, i) => (
+            <div key={i} style={{ marginTop: 8 }}>
+              {c.type === 'video' ? (
+                <a href={buildTimestampedUrl(c.url, c.timestamp)} target="_blank" rel="noreferrer">
+                  📹 {c.label}{c.timestamp ? ` — jumps to ${c.timestamp}s` : ''}
                 </a>
               ) : (
-                <a href={chatResult.citation.url} target="_blank" rel="noreferrer">📄 {chatResult.citation.label}</a>
+                <a href={c.url} target="_blank" rel="noreferrer">📄 {c.label}</a>
               )}
             </div>
-          )}
+          ))}
         </div>
 
         <div className="card-flat">

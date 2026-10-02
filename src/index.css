@@ -102,6 +102,57 @@ body {
   font-weight: 600;
 }
 
+.model-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 16px;
+  padding: 16px 20px 20px 20px;
+}
+
+.model-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-align: center;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.model-card:hover {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+.model-card-icon {
+  width: 56px;
+  height: 56px;
+  clip-path: polygon(25% 2%, 75% 2%, 100% 50%, 75% 98%, 25% 98%, 0% 50%);
+  background: var(--green-gradient);
+  color: white;
+  font-weight: 700;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.model-card-name {
+  font-weight: 600;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.model-card-admin {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
 .breadcrumb {
   font-size: 13px;
   color: var(--steel-light);

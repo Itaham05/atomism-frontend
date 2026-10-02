@@ -551,6 +551,28 @@ function App() {
     );
   }
 
+  // ---------- Breadcrumb trail ----------
+  function Breadcrumb() {
+    const crumbs = [{ label: 'Home', onClick: resetAllScreens }];
+    if (selectedModel) crumbs.push({ label: selectedModel.name, onClick: () => handleSelectModel(selectedModel) });
+    if (selectedVariant) crumbs.push({ label: selectedVariant.name, onClick: () => handleSelectVariant(selectedVariant) });
+    if (selectedAggregate) crumbs.push({ label: selectedAggregate.name, onClick: () => handleSelectAggregate(selectedAggregate) });
+    if (selectedAssembly) crumbs.push({ label: selectedAssembly.name, onClick: () => handleSelectAssembly(selectedAssembly) });
+    if (selectedSubassembly) crumbs.push({ label: selectedSubassembly.name, onClick: () => handleSelectSubassembly(selectedSubassembly) });
+    if (selectedPart) crumbs.push({ label: selectedPart.part_number, onClick: null });
+    if (crumbs.length === 1) return null;
+    return (
+      <div className="breadcrumb">
+        {crumbs.map((c, i) => (
+          <span key={i}>
+            {i > 0 && <span style={{ margin: '0 4px' }}>›</span>}
+            {c.onClick ? <span className="crumb" onClick={c.onClick}>{c.label}</span> : <span>{c.label}</span>}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
   // ---------- Main pane content, by selection depth ----------
   function mainPaneContent() {
     if (selectedPart) {
@@ -967,29 +989,32 @@ function App() {
 
         <div className="card-flat">
           <div style={{ padding: '16px 18px 0 18px' }} className="section-title">Browse by Model</div>
-          <ul className="list">
+          <div className="model-card-grid">
             {models.map((m) => (
-              <li key={m.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                {editing?.type === 'model' && editing.id === m.id ? (
-                  <div style={{ display: 'flex', gap: 6, flex: 1, alignItems: 'center' }}>
+              editing?.type === 'model' && editing.id === m.id ? (
+                <div key={m.id} className="model-card" style={{ cursor: 'default' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
                     <input className="input" style={{ marginBottom: 0 }} value={editing.values.name} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, name: e.target.value } })} />
-                    <button className="btn" onClick={saveEdit}>Save</button>
-                    <button className="btn btn-secondary" onClick={cancelEdit}>Cancel</button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn" onClick={saveEdit}>Save</button>
+                      <button className="btn btn-secondary" onClick={cancelEdit}>Cancel</button>
+                    </div>
                   </div>
-                ) : (
-                  <>
-                    <span style={{ cursor: 'pointer', flex: 1 }} onClick={() => handleSelectModel(m)}>{m.name}</span>
-                    {userRole === 'admin' && (
-                      <span style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn btn-secondary" onClick={() => startEdit('model', m)}>Edit</button>
-                        <button className="btn btn-danger" onClick={() => handleDeleteModel(m.id)}>Delete</button>
-                      </span>
-                    )}
-                  </>
-                )}
-              </li>
+                </div>
+              ) : (
+                <div key={m.id} className="model-card" onClick={() => handleSelectModel(m)}>
+                  <div className="model-card-icon">{m.name.trim().charAt(0).toUpperCase()}</div>
+                  <div className="model-card-name">{m.name}</div>
+                  {userRole === 'admin' && (
+                    <div className="model-card-admin" onClick={(e) => e.stopPropagation()}>
+                      <button className="btn btn-secondary" onClick={() => startEdit('model', m)}>Edit</button>
+                      <button className="btn btn-danger" onClick={() => handleDeleteModel(m.id)}>Delete</button>
+                    </div>
+                  )}
+                </div>
+              )
             ))}
-          </ul>
+          </div>
           {editError && <p className="error-text" style={{ padding: '0 18px' }}>{editError}</p>}
           {userRole === 'admin' && (
             <div className="admin-box">
@@ -1029,7 +1054,7 @@ function App() {
       <TopNav />
       <div className="body-shell">
         <TreeSidebar />
-        <div className="main-pane">{mainPaneContent()}</div>
+        <div className="main-pane"><Breadcrumb />{mainPaneContent()}</div>
       </div>
     </div>
   );

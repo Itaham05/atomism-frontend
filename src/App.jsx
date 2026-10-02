@@ -70,6 +70,7 @@ function App() {
   const [chatQuery, setChatQuery] = useState('');
   const [chatResult, setChatResult] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatWidgetOpen, setChatWidgetOpen] = useState(false);
 
   // Art+BOM toolbar state
   const [viewMode, setViewMode] = useState('both'); // 'both' | 'art' | 'bom'
@@ -573,39 +574,49 @@ function App() {
     );
   }
 
+  function PartDetailBody() {
+    return (
+      <>
+        <h2 className="title mono">{selectedPart.part_number}</h2>
+        <p className="subtitle" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>{selectedPart.description}</p>
+        {selectedPart.is_obsolete && (
+          <p style={{ fontSize: 13, padding: '4px 10px', borderRadius: 4, background: '#fdecea', color: '#a33', fontWeight: 600, display: 'inline-block', marginRight: 8 }}>
+            ⚠ Obsolete{selectedPart.superseded_by ? ` — replaced by ${selectedPart.superseded_by}` : ''}
+          </p>
+        )}
+        {selectedPart.is_alternate && (
+          <p style={{ fontSize: 13, padding: '4px 10px', borderRadius: 4, background: '#eef4fb', color: '#2a5', fontWeight: 600, display: 'inline-block' }}>
+            Alternate part available
+          </p>
+        )}
+        <div className="section-title">Training Video</div>
+        {videoInfo?.available ? (
+          videoInfo.videos.map((v) => (
+            <p key={v.id}>🎥 <a className="link" href={buildTimestampedUrl(v.url, v.timestamp)} target="_blank" rel="noreferrer">{v.title || v.url}</a>{v.timestamp ? ` (jumps to ${v.timestamp}s)` : ''}</p>
+          ))
+        ) : (
+          <p className="muted">No video available for this part.</p>
+        )}
+        <div className="section-title" style={{ marginTop: 20 }}>Service Document</div>
+        {docInfo?.available ? (
+          docInfo.servicedocs.map((d) => (
+            <p key={d.id}>📄 <a className="link" href={d.url} target="_blank" rel="noreferrer">{d.url}</a></p>
+          ))
+        ) : (
+          <p className="muted">No service document available for this part.</p>
+        )}
+      </>
+    );
+  }
+
   // ---------- Main pane content, by selection depth ----------
   function mainPaneContent() {
-    if (selectedPart) {
+    // Reached via search or Intelli-Search with no diagram context loaded:
+    // show the part on its own full page.
+    if (selectedPart && !selectedSubassembly) {
       return (
         <div className="card">
-          <h2 className="title mono">{selectedPart.part_number}</h2>
-          <p className="subtitle" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>{selectedPart.description}</p>
-          {selectedPart.is_obsolete && (
-            <p style={{ fontSize: 13, padding: '4px 10px', borderRadius: 4, background: '#fdecea', color: '#a33', fontWeight: 600, display: 'inline-block', marginRight: 8 }}>
-              ⚠ Obsolete{selectedPart.superseded_by ? ` — replaced by ${selectedPart.superseded_by}` : ''}
-            </p>
-          )}
-          {selectedPart.is_alternate && (
-            <p style={{ fontSize: 13, padding: '4px 10px', borderRadius: 4, background: '#eef4fb', color: '#2a5', fontWeight: 600, display: 'inline-block' }}>
-              Alternate part available
-            </p>
-          )}
-          <div className="section-title">Training Video</div>
-          {videoInfo?.available ? (
-            videoInfo.videos.map((v) => (
-              <p key={v.id}>🎥 <a className="link" href={buildTimestampedUrl(v.url, v.timestamp)} target="_blank" rel="noreferrer">{v.title || v.url}</a>{v.timestamp ? ` (jumps to ${v.timestamp}s)` : ''}</p>
-            ))
-          ) : (
-            <p className="muted">No video available for this part.</p>
-          )}
-          <div className="section-title" style={{ marginTop: 20 }}>Service Document</div>
-          {docInfo?.available ? (
-            docInfo.servicedocs.map((d) => (
-              <p key={d.id}>📄 <a className="link" href={d.url} target="_blank" rel="noreferrer">{d.url}</a></p>
-            ))
-          ) : (
-            <p className="muted">No service document available for this part.</p>
-          )}
+          <PartDetailBody />
         </div>
       );
     }
@@ -632,6 +643,9 @@ function App() {
               <div className="card" style={{ flex: 1, minWidth: 300 }}>
                 <div className="section-title">Exploded Diagram</div>
                 <div className="diagram-box" style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}>
+                  {art?.image_url && (
+                    <img src={art.image_url} alt={selectedSubassembly.name} className="diagram-image" />
+                  )}
                   {parts.map((part) => (
                     <div
                       key={part.id}
@@ -749,6 +763,15 @@ function App() {
               </div>
             )}
           </div>
+
+          {selectedPart && (
+            <div className="part-panel-backdrop" onClick={() => setSelectedPart(null)}>
+              <div className="part-panel" onClick={(e) => e.stopPropagation()}>
+                <button className="part-panel-close" onClick={() => setSelectedPart(null)}>✕</button>
+                <PartDetailBody />
+              </div>
+            </div>
+          )}
         </>
       );
     }
@@ -960,33 +983,6 @@ function App() {
           )}
         </div>
 
-        <div className="card">
-          <div className="section-title">Intelli-Search (AI Assistant)</div>
-          <form onSubmit={handleAskChatbot} style={{ display: 'flex', gap: 8 }}>
-            <input className="input" style={{ marginBottom: 0 }} placeholder="e.g. my brake is making a squeaking noise" value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} />
-            <button className="btn" type="submit">Ask</button>
-          </form>
-          {chatLoading && <p className="muted" style={{ marginTop: 10 }}>Thinking...</p>}
-          {chatResult?.best_match && (
-            <div style={{ ...listItem, marginTop: 12 }} onClick={() => handleJumpToPart(chatResult.best_match)}>
-              <span className="mono part-number">{chatResult.best_match.part_number}</span>{chatResult.best_match.description}
-              <br /><small className="muted">Confidence: {(chatResult.confidence * 100).toFixed(1)}%</small>
-            </div>
-          )}
-          {chatResult?.answer && <p className="muted" style={{ marginTop: 10 }}>{chatResult.answer}</p>}
-          {chatResult?.citations?.map((c, i) => (
-            <div key={i} style={{ marginTop: 8 }}>
-              {c.type === 'video' ? (
-                <a href={buildTimestampedUrl(c.url, c.timestamp)} target="_blank" rel="noreferrer">
-                  📹 {c.label}{c.timestamp ? ` — jumps to ${c.timestamp}s` : ''}
-                </a>
-              ) : (
-                <a href={c.url} target="_blank" rel="noreferrer">📄 {c.label}</a>
-              )}
-            </div>
-          ))}
-        </div>
-
         <div className="card-flat">
           <div style={{ padding: '16px 18px 0 18px' }} className="section-title">Browse by Model</div>
           <div className="model-card-grid">
@@ -1056,6 +1052,41 @@ function App() {
         <TreeSidebar />
         <div className="main-pane"><Breadcrumb />{mainPaneContent()}</div>
       </div>
+
+      <button className="chat-fab" onClick={() => setChatWidgetOpen((o) => !o)} title="Intelli-Search">
+        {chatWidgetOpen ? '✕' : '💬'}
+      </button>
+
+      {chatWidgetOpen && (
+        <div className="chat-widget">
+          <div className="chat-widget-header">Intelli-Search (AI Assistant)</div>
+          <div className="chat-widget-body">
+            <form onSubmit={handleAskChatbot} style={{ display: 'flex', gap: 8 }}>
+              <input className="input" style={{ marginBottom: 0 }} placeholder="e.g. my brake is making a squeaking noise" value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} />
+              <button className="btn" type="submit">Ask</button>
+            </form>
+            {chatLoading && <p className="muted" style={{ marginTop: 10 }}>Thinking...</p>}
+            {chatResult?.best_match && (
+              <div style={{ ...listItem, marginTop: 12 }} onClick={() => handleJumpToPart(chatResult.best_match)}>
+                <span className="mono part-number">{chatResult.best_match.part_number}</span>{chatResult.best_match.description}
+                <br /><small className="muted">Confidence: {(chatResult.confidence * 100).toFixed(1)}%</small>
+              </div>
+            )}
+            {chatResult?.answer && <p className="muted" style={{ marginTop: 10 }}>{chatResult.answer}</p>}
+            {chatResult?.citations?.map((c, i) => (
+              <div key={i} style={{ marginTop: 8 }}>
+                {c.type === 'video' ? (
+                  <a href={buildTimestampedUrl(c.url, c.timestamp)} target="_blank" rel="noreferrer">
+                    📹 {c.label}{c.timestamp ? ` — jumps to ${c.timestamp}s` : ''}
+                  </a>
+                ) : (
+                  <a href={c.url} target="_blank" rel="noreferrer">📄 {c.label}</a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

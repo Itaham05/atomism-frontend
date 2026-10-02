@@ -18,6 +18,7 @@ function App() {
   const [token, setToken] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [error, setError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
 
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState(null);
@@ -71,6 +72,12 @@ function App() {
   const [chatResult, setChatResult] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatWidgetOpen, setChatWidgetOpen] = useState(false);
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState(null); // { message, onConfirm } | null
+
+  function requestConfirm(message, onConfirm) {
+    setConfirmDialog({ message, onConfirm });
+  }
 
   // Art+BOM toolbar state
   const [viewMode, setViewMode] = useState('both'); // 'both' | 'art' | 'bom'
@@ -95,6 +102,7 @@ function App() {
   async function handleLogin(e) {
     e.preventDefault();
     setError('');
+    setLoginLoading(true);
     const body = new URLSearchParams();
     body.append('username', username);
     body.append('password', password);
@@ -106,14 +114,17 @@ function App() {
       });
       if (!response.ok) {
         setError('Incorrect username or password');
+        setLoginLoading(false);
         return;
       }
       const data = await response.json();
       setToken(data.access_token);
       setUserRole(decodeRole(data.access_token));
-      fetchModels(data.access_token);
+      await fetchModels(data.access_token);
+      setLoginLoading(false);
     } catch {
       setError('Could not reach the server');
+      setLoginLoading(false);
     }
   }
 
@@ -132,6 +143,7 @@ function App() {
   }
 
   async function handleSelectModel(model) {
+    setMobileTreeOpen(false);
     setSelectedModel(model);
     setSelectedVariant(null);
     setSelectedAggregate(null);
@@ -514,6 +526,7 @@ function App() {
     return (
       <>
         <div className="topnav">
+          <button className="mobile-menu-btn" onClick={() => setMobileTreeOpen((o) => !o)} aria-label="Toggle menu">☰</button>
           <div className="topnav-links">
             <span onClick={resetAllScreens}>Home</span>
             <span>Catalogue</span>
@@ -676,6 +689,9 @@ function App() {
                     </tr>
                   </thead>
                   <tbody>
+                    {parts.length === 0 && (
+                      <tr><td colSpan={userRole === 'admin' ? 6 : 5} className="muted" style={{ padding: '14px 10px' }}>No parts added yet.</td></tr>
+                    )}
                     {parts.map((part, i) => (
                       editing?.type === 'part' && editing.id === part.id ? (
                         <tr key={part.id} style={{ borderBottom: '1px solid #f0efe9', background: 'var(--orange-light)' }}>
@@ -738,7 +754,7 @@ function App() {
                             <td style={{ padding: '8px 10px' }}>
                               <div style={{ display: 'flex', gap: 6 }}>
                                 <button className="btn btn-secondary" onClick={(e) => { e.stopPropagation(); startEdit('part', part); }}>Edit</button>
-                                <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); handleDeletePart(part.id); }}>Delete</button>
+                                <button className="btn btn-danger" onClick={(e) => { e.stopPropagation(); requestConfirm(`Delete part ${part.part_number}? This cannot be undone.`, () => handleDeletePart(part.id)); }}>Delete</button>
                               </div>
                             </td>
                           )}
@@ -784,6 +800,7 @@ function App() {
             <p className="subtitle">Sub-Assemblies</p>
           </div>
           <ul className="list">
+            {subassemblies.length === 0 && <li className="muted" style={{ padding: '12px 18px' }}>No sub-assemblies yet.</li>}
             {subassemblies.map((sa) => (
               <li key={sa.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {editing?.type === 'subassembly' && editing.id === sa.id ? (
@@ -798,7 +815,7 @@ function App() {
                     {userRole === 'admin' && (
                       <span style={{ display: 'flex', gap: 6 }}>
                         <button className="btn btn-secondary" onClick={() => startEdit('subassembly', sa)}>Edit</button>
-                        <button className="btn btn-danger" onClick={() => handleDeleteSubassembly(sa.id)}>Delete</button>
+                        <button className="btn btn-danger" onClick={() => requestConfirm(`Delete sub-assembly "${sa.name}"? This also removes its diagram and parts.`, () => handleDeleteSubassembly(sa.id))}>Delete</button>
                       </span>
                     )}
                   </>
@@ -827,6 +844,7 @@ function App() {
             <p className="subtitle">Assemblies</p>
           </div>
           <ul className="list">
+            {assemblies.length === 0 && <li className="muted" style={{ padding: '12px 18px' }}>No assemblies yet.</li>}
             {assemblies.map((a) => (
               <li key={a.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {editing?.type === 'assembly' && editing.id === a.id ? (
@@ -841,7 +859,7 @@ function App() {
                     {userRole === 'admin' && (
                       <span style={{ display: 'flex', gap: 6 }}>
                         <button className="btn btn-secondary" onClick={() => startEdit('assembly', a)}>Edit</button>
-                        <button className="btn btn-danger" onClick={() => handleDeleteAssembly(a.id)}>Delete</button>
+                        <button className="btn btn-danger" onClick={() => requestConfirm(`Delete assembly "${a.name}"? This also removes everything under it.`, () => handleDeleteAssembly(a.id))}>Delete</button>
                       </span>
                     )}
                   </>
@@ -870,6 +888,7 @@ function App() {
             <p className="subtitle">Aggregates</p>
           </div>
           <ul className="list">
+            {aggregates.length === 0 && <li className="muted" style={{ padding: '12px 18px' }}>No aggregates yet.</li>}
             {aggregates.map((agg) => (
               <li key={agg.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {editing?.type === 'aggregate' && editing.id === agg.id ? (
@@ -884,7 +903,7 @@ function App() {
                     {userRole === 'admin' && (
                       <span style={{ display: 'flex', gap: 6 }}>
                         <button className="btn btn-secondary" onClick={() => startEdit('aggregate', agg)}>Edit</button>
-                        <button className="btn btn-danger" onClick={() => handleDeleteAggregate(agg.id)}>Delete</button>
+                        <button className="btn btn-danger" onClick={() => requestConfirm(`Delete aggregate "${agg.name}"? This also removes everything under it.`, () => handleDeleteAggregate(agg.id))}>Delete</button>
                       </span>
                     )}
                   </>
@@ -913,6 +932,7 @@ function App() {
             <p className="subtitle">Variants</p>
           </div>
           <ul className="list">
+            {variants.length === 0 && <li className="muted" style={{ padding: '12px 18px' }}>No variants yet.</li>}
             {variants.map((v) => (
               <li key={v.id} style={{ ...listItem, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {editing?.type === 'variant' && editing.id === v.id ? (
@@ -929,7 +949,7 @@ function App() {
                     {userRole === 'admin' && (
                       <span style={{ display: 'flex', gap: 6 }}>
                         <button className="btn btn-secondary" onClick={() => startEdit('variant', v)}>Edit</button>
-                        <button className="btn btn-danger" onClick={() => handleDeleteVariant(v.id)}>Delete</button>
+                        <button className="btn btn-danger" onClick={() => requestConfirm(`Delete variant "${v.name}"? This also removes everything under it.`, () => handleDeleteVariant(v.id))}>Delete</button>
                       </span>
                     )}
                   </>
@@ -986,6 +1006,7 @@ function App() {
         <div className="card-flat">
           <div style={{ padding: '16px 18px 0 18px' }} className="section-title">Browse by Model</div>
           <div className="model-card-grid">
+            {models.length === 0 && <p className="muted" style={{ padding: '0 18px' }}>No models yet. Add one below.</p>}
             {models.map((m) => (
               editing?.type === 'model' && editing.id === m.id ? (
                 <div key={m.id} className="model-card" style={{ cursor: 'default' }}>
@@ -1004,7 +1025,7 @@ function App() {
                   {userRole === 'admin' && (
                     <div className="model-card-admin" onClick={(e) => e.stopPropagation()}>
                       <button className="btn btn-secondary" onClick={() => startEdit('model', m)}>Edit</button>
-                      <button className="btn btn-danger" onClick={() => handleDeleteModel(m.id)}>Delete</button>
+                      <button className="btn btn-danger" onClick={() => requestConfirm(`Delete model "${m.name}"? This also removes every variant, aggregate, assembly and part under it.`, () => handleDeleteModel(m.id))}>Delete</button>
                     </div>
                   )}
                 </div>
@@ -1037,7 +1058,7 @@ function App() {
           <form onSubmit={handleLogin}>
             <input className="input" type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
             <input className="input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            <button className="btn" type="submit" style={{ width: '100%' }}>Log in</button>
+            <button className="btn" type="submit" style={{ width: '100%' }} disabled={loginLoading}>{loginLoading ? 'Logging in…' : 'Log in'}</button>
             {error && <p className="error-text">{error}</p>}
           </form>
         </div>
@@ -1049,9 +1070,24 @@ function App() {
     <div className="app-shell">
       <TopNav />
       <div className="body-shell">
-        <TreeSidebar />
+        <div className={`tree-sidebar-wrap ${mobileTreeOpen ? 'tree-sidebar-open' : ''}`}>
+          <TreeSidebar />
+        </div>
+        {mobileTreeOpen && <div className="tree-sidebar-backdrop" onClick={() => setMobileTreeOpen(false)} />}
         <div className="main-pane"><Breadcrumb />{mainPaneContent()}</div>
       </div>
+
+      {confirmDialog && (
+        <div className="part-panel-backdrop" onClick={() => setConfirmDialog(null)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>{confirmDialog.message}</p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button className="btn btn-secondary" onClick={() => setConfirmDialog(null)}>Cancel</button>
+              <button className="btn btn-danger" onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <button className="chat-fab" onClick={() => setChatWidgetOpen((o) => !o)} title="Intelli-Search">
         {chatWidgetOpen ? '✕' : '💬'}

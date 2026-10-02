@@ -597,14 +597,77 @@ body {
   padding: 24px;
 }
 
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  margin-right: 12px;
+}
+
+.confirm-dialog {
+  background: white;
+  border-radius: 10px;
+  padding: 20px 22px;
+  width: min(380px, calc(100vw - 48px));
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+}
+
+.tree-sidebar-backdrop {
+  display: none;
+}
+
 @media (max-width: 780px) {
-  .tree-sidebar {
-    width: 100%;
-    max-height: 240px;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
+  .mobile-menu-btn {
+    display: inline-block;
   }
+
+  .topnav-links span:not(:first-child) {
+    display: none;
+  }
+
   .body-shell {
     flex-direction: column;
+    position: relative;
+  }
+
+  .tree-sidebar-wrap {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 82%;
+    max-width: 320px;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease-out;
+    z-index: 250;
+  }
+
+  .tree-sidebar-wrap.tree-sidebar-open {
+    transform: translateX(0);
+  }
+
+  .tree-sidebar {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+  }
+
+  .tree-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 240;
+  }
+
+  .main-pane {
+    padding: 14px;
+  }
+
+  .chat-widget {
+    bottom: 80px;
   }
 }

@@ -1224,15 +1224,14 @@ function App() {
           </div>
           <h1 className="login-panel-headline">Electronic Parts Catalogue</h1>
           <p className="login-panel-copy">
-            Look up parts by VIN, engine number, module or description — see the
-            exploded diagram, the BOM, the right training video and the right
-            service document, all in one place.
+            Atomism is the old idea that everything, no matter how complicated, breaks
+            down to its smallest working piece — and that's really all a vehicle is
+            once you open it up. This is where you find that piece. Search by VIN,
+            engine number, module or plain description, pull up the exploded diagram
+            and the BOM side by side, and if you're not sure what you're even looking
+            for, just ask Intelli-Search — it'll point you to the part, the video, and
+            the service note that actually answers your question.
           </p>
-          <ul className="login-panel-list">
-            <li>5 ways to find any part</li>
-            <li>Intelli-Search, the AI assistant</li>
-            <li>Every answer cited back to its source</li>
-          </ul>
         </div>
         <div className="login-form-side">
           <div className="login-card">

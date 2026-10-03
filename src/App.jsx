@@ -3,6 +3,31 @@ import './index.css';
 
 const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
+// Admin file uploads go straight from the browser to Cloudinary's free tier
+// (no card required), then we save the URL Cloudinary gives back. Pravinkumar
+// just needs his own Cloudinary account: cloud name + an "unsigned" upload
+// preset, both free, both set here as environment variables.
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '';
+
+async function uploadToCloudinary(file) {
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+    throw new Error('File upload is not configured yet — ask an admin to set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET.');
+  }
+  const isPdf = file.type === 'application/pdf';
+  const endpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${isPdf ? 'raw' : 'image'}/upload`;
+  const body = new FormData();
+  body.append('file', file);
+  body.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  const res = await fetch(endpoint, { method: 'POST', body });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Cloudinary upload failed: ${detail}`);
+  }
+  const data = await res.json();
+  return data.secure_url;
+}
+
 function decodeRole(token) {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
@@ -75,6 +100,15 @@ function App() {
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState(null); // { message, onConfirm } | null
 
+  const [diagramUploading, setDiagramUploading] = useState(false);
+  const [diagramUploadError, setDiagramUploadError] = useState('');
+  const [newVideoUrl, setNewVideoUrl] = useState('');
+  const [newVideoTitle, setNewVideoTitle] = useState('');
+  const [newVideoTimestamp, setNewVideoTimestamp] = useState('0:00');
+  const [addVideoError, setAddVideoError] = useState('');
+  const [docUploading, setDocUploading] = useState(false);
+  const [docUploadError, setDocUploadError] = useState('');
+
   function requestConfirm(message, onConfirm) {
     setConfirmDialog({ message, onConfirm });
   }
@@ -129,11 +163,58 @@ function App() {
   }
 
   function handleLogout() {
+    // Clear EVERYTHING, not just the current screen — otherwise whatever
+    // the previous person typed or clicked (chat questions, search results,
+    // video/doc panels, half-filled admin forms) is still sitting in memory
+    // when the next person logs in on the same browser.
     setToken(null);
     setUserRole(null);
     setUsername('');
     setPassword('');
+
     setModels([]);
+    setVariants([]);
+    setAggregates([]);
+    setAssemblies([]);
+    setSubassemblies([]);
+    setArt(null);
+    setParts([]);
+    setHoveredPartId(null);
+
+    setVideoInfo(null);
+    setDocInfo(null);
+
+    setSearchQuery('');
+    setSearchResults(null);
+
+    setChatQuery('');
+    setChatResult(null);
+    setChatLoading(false);
+    setChatWidgetOpen(false);
+
+    setEditing(null);
+    setEditError('');
+    setConfirmDialog(null);
+    setMobileTreeOpen(false);
+    setNotice(null);
+
+    setNewPartNumber('');
+    setNewPartDescription('');
+    setNewPartX('');
+    setNewPartY('');
+    setAddPartError('');
+    setNewVariantName('');
+    setNewVariantVin('');
+    setAddVariantError('');
+    setNewAggregateName('');
+    setAddAggregateError('');
+    setNewAssemblyName('');
+    setAddAssemblyError('');
+    setNewSubassemblyName('');
+    setAddSubassemblyError('');
+    setNewModelName('');
+    setAddModelError('');
+
     resetAllScreens();
   }
 
@@ -193,6 +274,60 @@ function App() {
       const partsRes = await fetch(`${API}/art/${artData.id}/parts`, { headers: authHeader(token) });
       setParts(await partsRes.json());
     }
+  }
+
+  async function handleDiagramFileChosen(e) {
+    const file = e.target.files?.[0];
+    if (!file || !selectedSubassembly) return;
+    setDiagramUploadError('');
+    setDiagramUploading(true);
+    try {
+      const imageUrl = await uploadToCloudinary(file);
+      const params = new URLSearchParams({ image_url: imageUrl });
+      const res = await fetch(`${API}/subassemblies/${selectedSubassembly.id}/art?${params}`, {
+        method: 'PUT',
+        headers: authHeader(token),
+      });
+      if (!res.ok) throw new Error(`Server rejected the image (HTTP ${res.status})`);
+      await handleSelectSubassembly(selectedSubassembly);
+    } catch (err) {
+      setDiagramUploadError(err.message);
+    }
+    setDiagramUploading(false);
+  }
+
+  async function handleAddVideo(e) {
+    e.preventDefault();
+    if (!selectedPart || !newVideoUrl.trim()) return;
+    setAddVideoError('');
+    try {
+      const params = new URLSearchParams({ url: newVideoUrl.trim(), title: newVideoTitle.trim(), timestamp: newVideoTimestamp.trim() || '0:00' });
+      const res = await fetch(`${API}/parts/${selectedPart.id}/videos?${params}`, { method: 'POST', headers: authHeader(token) });
+      if (!res.ok) throw new Error(`Server rejected the video (HTTP ${res.status})`);
+      setNewVideoUrl('');
+      setNewVideoTitle('');
+      setNewVideoTimestamp('0:00');
+      await handleSelectPart(selectedPart);
+    } catch (err) {
+      setAddVideoError(err.message);
+    }
+  }
+
+  async function handleDocFileChosen(e) {
+    const file = e.target.files?.[0];
+    if (!file || !selectedPart) return;
+    setDocUploadError('');
+    setDocUploading(true);
+    try {
+      const docUrl = await uploadToCloudinary(file);
+      const params = new URLSearchParams({ url: docUrl });
+      const res = await fetch(`${API}/parts/${selectedPart.id}/servicedocs?${params}`, { method: 'POST', headers: authHeader(token) });
+      if (!res.ok) throw new Error(`Server rejected the document (HTTP ${res.status})`);
+      await handleSelectPart(selectedPart);
+    } catch (err) {
+      setDocUploadError(err.message);
+    }
+    setDocUploading(false);
   }
 
   async function handleSelectPart(part) {
@@ -618,6 +753,26 @@ function App() {
         ) : (
           <p className="muted">No service document available for this part.</p>
         )}
+
+        {userRole === 'admin' && (
+          <div className="admin-box" style={{ marginTop: 20 }}>
+            <div className="section-title">Add Training Video (Admin)</div>
+            <form onSubmit={handleAddVideo}>
+              <input className="input" placeholder="YouTube or Vimeo URL" value={newVideoUrl} onChange={(e) => setNewVideoUrl(e.target.value)} />
+              <input className="input" placeholder="Title (optional)" value={newVideoTitle} onChange={(e) => setNewVideoTitle(e.target.value)} />
+              <input className="input" placeholder="Jump-to timestamp, e.g. 1:24" value={newVideoTimestamp} onChange={(e) => setNewVideoTimestamp(e.target.value)} />
+              <button className="btn" type="submit">Add Video</button>
+            </form>
+            {addVideoError && <p className="error-text">{addVideoError}</p>}
+
+            <div className="section-title" style={{ marginTop: 16 }}>Add Service Document (Admin)</div>
+            <label className="btn btn-secondary" style={{ display: 'inline-block', cursor: 'pointer' }}>
+              {docUploading ? 'Uploading…' : 'Upload PDF'}
+              <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={handleDocFileChosen} disabled={docUploading} />
+            </label>
+            {docUploadError && <p className="error-text">{docUploadError}</p>}
+          </div>
+        )}
       </>
     );
   }
@@ -671,6 +826,15 @@ function App() {
                     </div>
                   ))}
                 </div>
+                {userRole === 'admin' && (
+                  <div style={{ marginTop: 10 }}>
+                    <label className="btn btn-secondary" style={{ display: 'inline-block', cursor: 'pointer' }}>
+                      {diagramUploading ? 'Uploading…' : (art?.image_url ? 'Replace diagram image' : 'Upload diagram image')}
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleDiagramFileChosen} disabled={diagramUploading} />
+                    </label>
+                    {diagramUploadError && <p className="error-text">{diagramUploadError}</p>}
+                  </div>
+                )}
               </div>
             )}
 
@@ -974,6 +1138,10 @@ function App() {
     // Home
     return (
       <>
+        <div className="home-hero">
+          <h1>Find any part in seconds</h1>
+          <p>Search by description, part number, VIN, engine number or module — or just ask Intelli-Search.</p>
+        </div>
           <div className="card">
           <div className="section-title">Advance Search</div>
           <form onSubmit={handleAdvancedSearch} style={{ display: 'flex', gap: 8 }}>
@@ -1050,17 +1218,33 @@ function App() {
   if (!token) {
     return (
       <div className="login-wrap">
-        <div className="login-card">
-          <div className="brand" style={{ color: 'var(--charcoal)', marginBottom: 4 }}>
+        <div className="login-panel">
+          <div className="login-panel-brand">
             <span className="dot"></span>ATOMISM
           </div>
-          <p className="subtitle" style={{ marginBottom: 20 }}>Parts · Service · Training</p>
-          <form onSubmit={handleLogin}>
-            <input className="input" type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
-            <input className="input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            <button className="btn" type="submit" style={{ width: '100%' }} disabled={loginLoading}>{loginLoading ? 'Logging in…' : 'Log in'}</button>
-            {error && <p className="error-text">{error}</p>}
-          </form>
+          <h1 className="login-panel-headline">Electronic Parts Catalogue</h1>
+          <p className="login-panel-copy">
+            Look up parts by VIN, engine number, module or description — see the
+            exploded diagram, the BOM, the right training video and the right
+            service document, all in one place.
+          </p>
+          <ul className="login-panel-list">
+            <li>5 ways to find any part</li>
+            <li>Intelli-Search, the AI assistant</li>
+            <li>Every answer cited back to its source</li>
+          </ul>
+        </div>
+        <div className="login-form-side">
+          <div className="login-card">
+            <h2 className="login-card-title">Sign in</h2>
+            <p className="subtitle" style={{ marginBottom: 20 }}>Parts · Service · Training</p>
+            <form onSubmit={handleLogin}>
+              <input className="input" type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
+              <input className="input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <button className="btn" type="submit" style={{ width: '100%' }} disabled={loginLoading}>{loginLoading ? 'Logging in…' : 'Log in'}</button>
+              {error && <p className="error-text">{error}</p>}
+            </form>
+          </div>
         </div>
       </div>
     );
